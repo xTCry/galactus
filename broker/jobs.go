@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/go-redis/redis/v8"
 	"time"
 )
@@ -14,6 +15,8 @@ const (
 	Lobby
 	State
 	Player
+	NewGame
+	EndGame
 )
 
 type Job struct {

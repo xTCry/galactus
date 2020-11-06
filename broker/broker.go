@@ -4,17 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-redis/redis/v8"
-	socketio "github.com/googollee/go-socket.io"
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/go-redis/redis/v8"
+	socketio "github.com/googollee/go-socket.io"
+	"github.com/gorilla/mux"
 )
 
 const ConnectCodeLength = 8
+const SecretKeyLength = 16
 
 var ctx = context.Background()
 
@@ -64,6 +66,57 @@ func (broker *Broker) Start(port string) {
 		log.Println("connected:", s.ID())
 		return nil
 	})
+
+	// => Plugin zone
+	// Secret key for connecting the Impostor server plugin
+	server.OnEvent("/", "secretKey", func(s socketio.Conn, msg string) {
+		log.Printf("Received secretKey: \"%s\"", msg)
+
+		if len(msg) != SecretKeyLength {
+			s.Close()
+		} else {
+			killChannel := make(chan bool)
+
+			broker.connectionsLock.Lock()
+			broker.connections[s.ID()] = msg
+			broker.ackKillChannels[s.ID()] = killChannel
+			broker.connectionsLock.Unlock()
+
+			// err := PushJob(ctx, broker.client, msg, Connection, "true")
+			// if err != nil {
+			// 	log.Println(err)
+			// }
+			// go broker.AckWorker(ctx, msg, killChannel)
+		}
+	})
+	server.OnEvent("/", "newGame", func(s socketio.Conn, msg string) {
+		log.Println("newGame:", msg)
+
+		broker.connectionsLock.RLock()
+		if secretKey, ok := broker.connections[s.ID()]; ok {
+			err := PushJob(ctx, broker.client, secretKey, NewGame, msg)
+			if err != nil {
+				log.Println(err)
+			} else {
+				s.Emit("gameAdded", msg)
+			}
+		}
+		broker.connectionsLock.RUnlock()
+	})
+	server.OnEvent("/", "endGame", func(s socketio.Conn, msg string) {
+		log.Println("endGame:", msg)
+
+		broker.connectionsLock.RLock()
+		if secretKey, ok := broker.connections[s.ID()]; ok {
+			err := PushJob(ctx, broker.client, secretKey, EndGame, msg)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+		broker.connectionsLock.RUnlock()
+	})
+	// <= end Plugin zone
+
 	server.OnEvent("/", "connectCode", func(s socketio.Conn, msg string) {
 		log.Printf("Received connection code: \"%s\"", msg)
 
@@ -100,7 +153,6 @@ func (broker *Broker) Start(port string) {
 			}
 		}
 		broker.connectionsLock.RUnlock()
-
 	})
 	server.OnEvent("/", "state", func(s socketio.Conn, msg string) {
 		log.Println("phase received from capture: ", msg)
@@ -158,6 +210,7 @@ func (broker *Broker) Start(port string) {
 		delete(broker.connections, s.ID())
 		broker.connectionsLock.Unlock()
 	})
+
 	go server.Serve()
 	defer server.Close()
 
@@ -178,6 +231,20 @@ func (broker *Broker) Start(port string) {
 			"activeConnections": activeConns,
 			"activeGames":       activeGames,
 		}
+
+		jsonBytes, err := json.Marshal(data)
+		if err != nil {
+			log.Println(err)
+		}
+		w.Write(jsonBytes)
+	})
+	router.HandleFunc("/debug", func(w http.ResponseWriter, r *http.Request) {
+		broker.connectionsLock.RLock()
+		data := map[string]interface{}{
+			"activeConnections": len(broker.connections),
+			"connections":       broker.connections,
+		}
+		broker.connectionsLock.RUnlock()
 
 		jsonBytes, err := json.Marshal(data)
 		if err != nil {
