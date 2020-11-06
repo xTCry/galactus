@@ -1,19 +1,24 @@
 package main
 
 import (
-	"github.com/automuteus/galactus/broker"
-	"github.com/automuteus/galactus/galactus"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
+
+	"github.com/automuteus/galactus/broker"
+	"github.com/automuteus/galactus/galactus"
+
+	"github.com/joho/godotenv"
 )
 
 const DefaultGalactusPort = "5858"
 const DefaultBrokerPort = "8123"
 
 func main() {
+	godotenv.Load("config.txt")
+
 	redisAddr := os.Getenv("REDIS_ADDRESS")
 	if redisAddr == "" {
 		log.Fatal("No REDIS_ADDRESS specified. Exiting.")
