@@ -5,13 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/bwmarrin/discordgo"
-	"github.com/go-redis/redis/v8"
-	"github.com/gorilla/mux"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
+
+	"github.com/bwmarrin/discordgo"
+	"github.com/go-redis/redis/v8"
+	"github.com/gorilla/mux"
 )
 
 var ctx = context.Background()

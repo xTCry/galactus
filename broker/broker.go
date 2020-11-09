@@ -98,7 +98,13 @@ func (broker *Broker) Start(port string) {
 			if err != nil {
 				log.Println(err)
 			} else {
-				s.Emit("gameAdded", msg)
+				dGame := DiscordGame{}
+				if err == nil {
+					err = json.Unmarshal([]byte(msg), &dGame)
+					if err == nil {
+						s.Emit("gameAdded", dGame)
+					}
+				}
 			}
 		}
 		broker.connectionsLock.RUnlock()

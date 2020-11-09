@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/go-redis/redis/v8"
 	"time"
+
+	"github.com/go-redis/redis/v8"
 )
 
 type JobType int
@@ -22,6 +23,11 @@ const (
 type Job struct {
 	JobType JobType     `json:"type"`
 	Payload interface{} `json:"payload"`
+}
+
+// renama this pls
+type DiscordGame struct {
+	LobbyCode string `json:"LobbyCode"`
 }
 
 const JobTTLSeconds = 3600
